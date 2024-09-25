@@ -5,6 +5,11 @@ website:
   title: "Bite-sized_workshop"
   navbar:
     left:
+      - text: "R Series"
+        menu:
+        - text: "Episode 6"
+          href: Rseries/Episode6.html
+    right:
       - href: index.qmd
         text: Home
       - about.qmd

@@ -1,0 +1,675 @@
+---
+title: "Episode 6: Financial Data Analysis with R"
+format: 
+  html:
+    toc: true
+editor: visual
+---
+
+## Overview
+
+In this series, we are going to explore the tidymodels approach in financial analysis. By the end of this session, you will learn how to:
+
+-   extract stock prices data from an online portal such as Yahoo Finance
+-   wrangling stock price data,
+-   performing technical analysis using ,
+-   conduct performance analysis
+
+## Introducing tidyquant
+
+-   [tidyquant](https://business-science.github.io/tidyquant/index.html) integrates the best resources for collecting and analyzing financial data, [zoo](https://cran.r-project.org/web/packages/zoo/index.html), [xts](https://cran.r-project.org/web/packages/xts/), [quantmod](https://www.quantmod.com/), [TTR](https://cran.r-project.org/web/packages/TTR/), and [PerformanceAnalytics](https://cran.r-project.org/web/packages/PerformanceAnalytics/), with the tidy data infrastructure of the tidyverse allowing for seamless interaction between each.
+-   With tidyquant, we can now perform complete financial analyses using tidyverse framework.
+
+## Installing and Laoding the R Packages into R Environment
+
+In this session, four R packages will be used. They are: **tidyverse**, **tidyquant**, **timetk**, **knitr**.
+
+::: {style="font-size: 1.35em"}
+```{r}
+pacman::p_load(tidyquant, timetk,
+               tidyverse, knitr)
+```
+:::
+
+## Extracting Financial Data
+
+Data extraction is the starting point of any financial data analysis. [`tq_get()`](https://business-science.github.io/tidyquant/reference/tq_get.html) is specially designed for extracting quantitative financial data from the following online portals:
+
+-   **Yahoo Finance** - Daily stock data
+
+-   **FRED** - Economic data
+
+-   **Quandl** - Economic, Energy, & Financial Data API
+
+-   **Tiingo** - Financial API with sub-daily stock data and crypto-currency
+
+-   **Alpha Vantage** - Financial API with sub-daily, ForEx, and crypto-currency data
+
+-   **Bloomberg** - Financial API. Paid account is required.
+
+### Importing companies data
+
+For the purpose of this hands-on exercise, we are interested to analyse the stock prices of six companies in Singapore. The companies and related information are provided in *company.csv* file.
+
+Code chunk below is used to important *company.csv* into R environment.
+
+::: {style="font-size: 1.35em"}
+```{r}
+company <- read_csv("data/SGCompany.csv")
+company
+```
+:::
+
+### Extracting stock prices from Yahoo Finance
+
+In this code chunk below, `tq_get()` is used to get stock prices from Yahoo Finance. The time period for the data was set from 1 January 2022 to 31 December 2023.
+
+::: {style="font-size: 1.35em"}
+```{r}
+Stock_daily <- company %>%
+  select(Symbol) %>%
+  tq_get(get = "stock.prices", 
+         from = "2022-01-01", 
+         to = "2024-09-22") 
+```
+:::
+
+### Wrangling stock data
+
+Next, [`left_join()`](https://dplyr.tidyverse.org/reference/mutate-joins.html) of [**dplyr**](https://dplyr.tidyverse.org/index.html) package is used to append *Name* and *marketcap* fields of *company* tibble data frame into *Stock_daily* tibble data frame by using *Symbol* as the join field.
+
+::: {style="font-size: 1.35em"}
+```{r}
+Stock_data <- Stock_daily %>%
+  left_join(company)
+```
+:::
+
+## Technical Analysis: tidyquant methods
+
+-   [Technical analysis](https://www.investopedia.com/terms/t/technicalanalysis.asp) is that traders attempt to identify opportunities by looking at statistical trends, such as movements in a stock's price and volume. The core assumption is that all known fundamentals are factored into price, thus there is no need to pay close attention to them.
+
+-   Technical analysts do not attempt to measure a security's intrinsic value. Instead, they use stock charts to identify patterns and trends that suggest what a stock will do in the future.
+
+-   Popular technical analysis signals include simple moving averages (SMA), candlestick, Bollinger bands.
+
+### Plotting Stock Price Line Graph: ggplot methods
+
+In the code chunk below, `geom_line()` of ggplot2 is used to plot the stock prices.
+
+::: {style="font-size: 1.35em"}
+```{r eval=FALSE}
+#| eval: false
+Stock_data %>%
+  filter(Name == "UOB") %>%
+  ggplot(aes(x = date, y = close)) +
+    geom_line() +
+    labs(title = "DBS Group Holdings Ltd (DBSDF) Daily Stock Price", 
+         y = "Closing Price", x = "") + 
+    theme_tq()
+```
+:::
+
+```{r}
+#| echo: false
+Stock_data %>%
+  filter(Name == "UOB") %>%
+  ggplot(aes(x = date, y = close)) +
+    geom_line() +
+    labs(title = "DBS Group Holdings Ltd (DBSDF) Daily Stock Price", 
+         y = "Closing Price", x = "") + 
+    theme_tq()
+```
+
+### Visualising Stock Price with timetk
+
+In the code chunk below, [`plot_time_series()`](https://business-science.github.io/timetk/reference/plot_time_series.html) of **timetk** package is used plot line graphs with trend lines.
+
+::: {style="font-size: 1.25em"}
+```{r}
+#| eval: false
+Stock_data %>%
+  group_by(Name) %>%
+  plot_time_series(date, close,
+                   .facet_ncol   = 2,
+                   .facet_scales = "free",
+                   .interactive  = FALSE)
+```
+:::
+
+```{r}
+#| echo: false
+#| fig-height: 10
+Stock_data %>%
+  group_by(Name) %>%
+  plot_time_series(date, close,
+                   .facet_ncol   = 2,
+                   .facet_scales = "free",
+                   .interactive  = FALSE)
+```
+
+### Technical analysis with candlestick
+
+A [candlestick chart](https://www.investopedia.com/trading/candlestick-charting-what-is-it/) (also called Japanese candlestick chart or K-line) is a style of financial chart used to describe price movements of a security, derivative, or currency.
+
+::: panel-tabset
+## The code chunk
+
+In the code chunk below, [`geom_candlestick()`](https://business-science.github.io/tidyquant/reference/geom_chart.html) of tidyquant is used to plot the stock prices of DBS Group.
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| eval: false
+end <- as_date("2024-09-22")
+start <- end - weeks(4)
+Stock_data %>%
+  filter(Name == "DBS Group") %>%
+  filter(date >= start - days(2 * 15)) %>%
+  ggplot(aes(x=date, y=close)) +
+  geom_candlestick(aes(open=open,
+                       high=high,
+                       low=low,
+                       close=close)) +
+  labs(title =  "Daily stock prices of DBS Group") +
+  coord_x_date(xlim = c(start, end)) + 
+  theme_tq()
+```
+:::
+
+## The Plot
+
+```{r}
+#| echo: false
+#| fig-height: 6
+end <- as_date("2024-09-22")
+start <- end - weeks(4)
+Stock_data %>%
+  filter(Name == "DBS Group") %>%
+  filter(date >= start - days(2 * 15)) %>%
+  ggplot(aes(x=date, y=close)) +
+  geom_candlestick(aes(open=open,
+                       high=high,
+                       low=low,
+                       close=close)) +
+  labs(title =  "Daily stock prices of DBS Group") +
+  coord_x_date(xlim = c(start, end)) + 
+  theme_tq()
+```
+:::
+
+### Technical analysis with candlestick
+
+::: panel-tabset
+## The code chunk
+
+::: {style="font-size: 0.8em"}
+In the code chunk below, [`facet_wrap()`](https://ggplot2.tidyverse.org/reference/facet_wrap.html) of ggplot2 package is used to plot the stock prices of the selected six companies.
+:::
+
+::: {style="font-size: 1.20em"}
+```{r}
+#| eval: false
+end <- as_date("2024-09-22")
+start <- end - weeks(4)
+Stock_data %>%
+  filter(date >= start - days(2 * 15)) %>%
+  ggplot(aes(x=date, y=close, group = Name )) +
+  geom_candlestick(aes(open=open,
+                       high=high,
+                       low=low,
+                       close=close)) +
+  labs(title =  "Daily stock prices of selected six stocks") +
+  coord_x_date(xlim = c(start, end)) +
+  facet_wrap(~ Name, 
+             ncol = 2, 
+             scales = "free_y") + 
+  theme_tq()
+```
+:::
+
+## The Plot
+
+```{r}
+#| echo: false
+#| fig-height: 7
+#| fig-width: 14
+end <- as_date("2024-09-22")
+start <- end - weeks(4)
+Stock_data %>%
+  filter(date >= start - days(2 * 15)) %>%
+  ggplot(aes(x=date, y=close, group = Name )) +
+  geom_candlestick(aes(open=open,
+                       high=high,
+                       low=low,
+                       close=close)) +
+  labs(title =  "Daily stock prices of the selected six companies") +
+  coord_x_date(xlim = c(start, end)) +
+  facet_wrap(~ Name, ncol = 3, scales = "free_y") + theme_tq()
+```
+:::
+
+### Technical analysis with moving average
+
+In finance, a [moving average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp) is a stock indicator commonly used in technical analysis. The reason for calculating the moving average of a stock is to help smooth out the price data by creating a constantly updated average price.
+
+tidyquant includes geoms to enable "rapid prototyping" to quickly visualize signals using moving averages and Bollinger bands. The following moving averages are available:
+
+-   Simple moving averages (SMA)
+-   Exponential moving averages (EMA)
+-   Weighted moving averages (WMA)
+-   Double exponential moving averages (DEMA)
+-   Zero-lag exponential moving averages (ZLEMA)
+-   Volume-weighted moving averages (VWMA) (also known as VWAP)
+-   Elastic, volume-weighted moving averages (EVWMA) (also known as MVWAP)
+
+### Plotting the 5-day and 15-day simple moving average
+
+::: panel-tabset
+## The code chunk
+
+In the code chunk below, [`geom_ma()`](https://business-science.github.io/tidyquant/reference/geom_ma.html) of tidyquant package is used to overplot two moving average lines on the candlestick chart.
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| eval: false
+Stock_data %>%
+  filter(Symbol == "D05.SI") %>%
+  filter(date >= start - days(2 * 15)) %>%
+  ggplot(aes(x = date, y = close)) +
+  geom_candlestick(aes(open = open, high = high, low = low, close = close)) +
+  geom_ma(ma_fun = SMA, n = 5, linetype = 5, size = 1.25) +
+  geom_ma(ma_fun = SMA, n = 15, color = "red", size = 1.25) + 
+    labs(title = "DBS Group Holdings Ltd Daily Stock Price", 
+         subtitle = "5 and 15-Day SMA",
+         y = "Closing Price", x = "") + 
+    coord_x_date(xlim = c(end - weeks(5), end)) + 
+                   theme_tq()
+```
+:::
+
+::: {style="font-size: 0.8em"}
+Things you can learn from the code chunk:
+
+-   The moving average functions used are specified in [`SMA()`](https://www.rdocumentation.org/packages/TTR/versions/0.24.3/topics/SMA) from the [*TTR*](https://cran.r-project.org/web/packages/TTR/) package.
+:::
+
+## The Plot
+
+```{r}
+#| echo: false 
+#| fig-height: 7
+Stock_data %>%
+  filter(Symbol == "D05.SI") %>%
+  filter(date >= start - days(2 * 15)) %>%
+  ggplot(aes(x = date, y = close)) +
+  geom_candlestick(aes(open = open,
+                       high = high, 
+                       low = low, 
+                       close = close)) +
+  geom_ma(ma_fun = SMA, 
+          n = 5, 
+          linetype = 5, 
+          size = 1.25) +
+    geom_ma(ma_fun = SMA, 
+            n = 15, 
+            color = "red", 
+            size = 1.25) + 
+    labs(title = "DBS Group Holdings Ltd Daily Stock Price", 
+         subtitle = "5 and 15-Day SMA",
+         y = "Closing Price", x = "") + 
+    coord_x_date(xlim = c(end - weeks(5), end)) + 
+                   theme_tq()
+```
+:::
+
+## Plotting Bollinger Band: tidyquant method
+
+A [Bollinger Band](https://www.investopedia.com/terms/b/bollingerbands.asp) is a technical analysis tool defined by a set of trendlines plotted two standard deviations (positively and negatively) away from a simple moving average (SMA) of a security's price, but which can be adjusted to user preferences.
+
+In tidyquant, bollinger band can be plotted by using [`geom_bbands()`](https://business-science.github.io/tidyquant/reference/geom_bbands.html). Because they use a moving average, the `geom_bbands()` works almost identically to geom_ma. The same seven moving averages are compatible. The main difference is the addition of the standard deviation, sd, argument which is 2 by default, and the high, low and close aesthetics which are required to calculate the bands.
+
+### Plotting Bollinger Bands: tidyquant method
+
+::: panel-tabset
+## The code chunk
+
+::: {style="font-size: 0.8em"}
+In the code chunk below, [`geom_bbands()`](https://business-science.github.io/tidyquant/reference/geom_bbands.html) of tidyquant package is used to plot bollinger bands on closing stock prices of DBS Group.
+:::
+
+::: {style="font-size: 1.15em"}
+```{r}
+#| eval: false
+Stock_data %>%
+  filter(Name == "DBS Group") %>% 
+  ggplot(aes(x=date, y=close))+
+  geom_line(size=0.5)+
+  geom_bbands(aes(
+    high = high, low = low, close = close), 
+    ma_fun = SMA, sd = 2, n = 5,
+    size = 0.75, color_ma = "royalblue4", 
+    color_bands = "red1")+
+    coord_x_date(xlim = c("2022-01-01",
+                          "2022-06-30"), 
+                 expand = TRUE)+
+    labs(title = "DBS Group Holdings Ltd Daily Stock Price",
+         subtitle = "dotted red lines = bollinger bands",
+         x = "Date", y ="Close Price") +
+theme(legend.position="none")
+```
+:::
+
+::: {style="font-size: 0.5em"}
+Things you can learn from the code chunk:
+
+-   `geom_bbands()` plots a range around a moving average typically two standard deviations up and down. The moving average functions used are specified in [`SMA()`](https://www.rdocumentation.org/packages/TTR/versions/0.24.3/topics/SMA) from the [*TTR*](https://cran.r-project.org/web/packages/TTR/) package.
+:::
+
+## The Plot
+
+```{r}
+#| echo: false 
+#| fig-height: 7
+Stock_data %>%
+  filter(Name == "DBS Group") %>% 
+  ggplot(aes(x=date, y=close))+
+  geom_line(size=0.5)+
+  geom_bbands(aes(
+    high = high, low = low, close = close), 
+    ma_fun = SMA, sd = 2, n = 5,
+    size = 0.75, color_ma = "royalblue4", 
+    color_bands = "red1")+
+    coord_x_date(xlim = c("2022-01-01",
+                          "2022-06-30"), 
+                 expand = TRUE)+
+    labs(title = "DBS Group Holdings Ltd Daily Stock Price",
+         subtitle = "dotted red lines = bollinger bands",
+         x = "Date", y ="Close Price") +
+theme(legend.position="none")
+```
+:::
+
+## Performance Analysis with tidyquant
+
+Financial asset (individual stocks, securities, etc) and portfolio (groups of stocks, securities, etc) performance analysis is a deep field with a wide range of theories and methods for analyzing risk versus reward. The [PerformanceAnalytics](https://cran.r-project.org/web/packages/PerformanceAnalytics/) package consolidates functions to compute many of the most widely used performance metrics.
+
+tidquant integrates this functionality so it can be used at scale using the split, apply, combine framework within the tidyverse. Two primary functions integrate the performance analysis functionality:
+
+-   `tq_performance()` implements the performance analysis functions in a tidy way, enabling scaling analysis using the split, apply, combine framework.
+-   `tq_portfolio()` provides a useful tool set for aggregating a group of individual asset returns into one or many portfolios.
+
+### Time-based returns analysis with tidyquant
+
+An important concept of performance analysis is based on the statistical properties of returns (not prices). In the code chunk below, [`tq_transmute()`](https://business-science.github.io/tidyquant/reference/tq_mutate.html) to compute the monthly returns of the six stocks
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| eval: false
+Stock_monthly_returns <- Stock_data %>%
+    group_by(Name) %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn, 
+               period = "monthly",
+               type = "arithmetic")
+Stock_monthly_returns
+```
+:::
+
+::: {style="font-size: 1.0em"}
+```{r}
+#| echo: false
+Stock_monthly_returns <- Stock_data %>%
+    group_by(Name) %>%
+    tq_transmute(select     = adjusted, 
+                 mutate_fun = periodReturn, 
+                 period     = "monthly", 
+                 type       = "arithmetic")
+kable(head(Stock_monthly_returns, 28))
+```
+:::
+
+### Visualising time-based returns
+
+Since the output is in tibble data frame format, we can visualise the returns easily by using appropriate ggplot2 functions.
+
+::: panel-tabset
+## The code chunk
+
+::: {style="font-size: 1.2em"}
+```{r}
+#| eval: false
+Stock_monthly_returns %>%
+  ggplot(aes(x = date, 
+             y = monthly.returns, 
+             fill = Name)) +
+  geom_col() +
+  geom_hline(yintercept = 0, 
+             color = palette_light()[[1]]) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Monthly returns of the six selected stocks",
+       subtitle = "",
+       y = "Monthly Returns", x = "") + 
+  facet_wrap(~ Name, ncol = 3, scales = "free_y") +
+  theme_tq() + 
+  scale_fill_tq()
+```
+:::
+
+## The Plot
+
+```{r}
+#| echo: false
+#| fig-height: 6
+#| fig-width: 16
+Stock_monthly_returns %>%
+  ggplot(aes(x = date, 
+             y = monthly.returns, 
+             fill = Name)) +
+  geom_col() +
+  geom_hline(yintercept = 0, 
+             color = palette_light()[[1]]) +
+  scale_y_continuous(labels = scales::percent) +
+  labs(title = "Monthly returns of the six selected stocks",
+       subtitle = "",
+       y = "Monthly Returns", x = "") + 
+  facet_wrap(~ Name, ncol = 3, scales = "free_y") +
+  theme_tq() + 
+  scale_fill_tq()
+```
+:::
+
+## Portfolio Analysis with tidyquant
+
+Assuming that we have S\$100,000 investment in the three local banks since 1st January 2020 until 31th December 2023 and we would like to analyse how our money is growing.
+
+Code chunk below will be used to import *SGBank.csv* into R environment.
+
+::: {style="font-size: 1.35em"}
+```{r}
+SGBank <- read_csv("data/SGBank.csv")
+```
+:::
+
+Next, `tq_get()` will be used to extract and download the stock prices from Yahoo Finance.
+
+::: {style="font-size: 1.35em"}
+```{r}
+SGBank_daily <- SGBank %>%
+  select(Symbol) %>%
+  tq_get(get = "stock.prices", 
+         from = "2020-01-01", 
+         to = "2024-09-22") 
+```
+:::
+
+### Computing returns of individual bank
+
+In the code chunk below, `tq_transmute()` is used to compute the monthly returns for each bank.
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| echo: true
+SGBank_returns_monthly <- SGBank_daily %>%
+  group_by(Symbol) %>%
+  tq_transmute(select = adjusted,
+               mutate_fun = periodReturn,
+               period = "monthly",
+               col_rename = "Ra")
+```
+:::
+
+The code chunk below can then be used to display the first 10 records.
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| eval: false
+kable(head(SGBank_returns_monthly, 
+           n=10))
+```
+:::
+
+::: {style="font-size: 1.0em"}
+```{r}
+#| echo: false
+kable(head(SGBank_returns_monthly, n=10))
+```
+:::
+
+### Computing the combined returns
+
+In the code chunk below, `tq_portfolio()` is used to compute the combined returns of the three local banks.
+
+::: {style="font-size: 1.35em"}
+```{r}
+wts <- c(0.4, 0.3, 0.3)
+porfolio_returns_monthly <- SGBank_returns_monthly %>%
+  tq_portfolio(assets_col = Symbol,
+               returns_col = Ra,
+               weights = wts,
+               col_rename = "Ra")
+```
+:::
+
+The code chunk below can then be used to display the first 10 records.
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| eval: false
+kable(head(porfolio_returns_monthly, 
+           n=10))
+```
+:::
+
+::: {style="font-size: 1.0em"}
+```{r}
+#| echo: false
+kable(head(porfolio_returns_monthly, 
+           n=10))
+```
+:::
+
+### Visualising the combined portfolio returns
+
+::: panel-tabset
+## The code chunk
+
+In the code chunk below, ggplot2 functions are used to prepare a vidualisation showing the combined portfolio returns.
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| eval: false
+ggplot(data = porfolio_returns_monthly,
+       aes(x = date, y = Ra)) +
+  geom_bar(stat = "identity",
+           fill = palette_light()[[1]]) +
+  labs(title = "Porfoli Returns",
+       subtitle = "40% DBS, 30% OCBC and 30% UOB",
+       caption = "Shows an above zero trend meaning positive retuns",
+       x = "", y = "Monthly Returns") +
+  geom_smooth(method = "lm") +
+  theme_tq() + 
+  scale_color_tq() +
+  scale_y_continuous(labels = scales::percent)
+```
+:::
+
+## The Plot
+
+```{r}
+#| echo: false
+#| fig-height: 7
+ggplot(data = porfolio_returns_monthly,
+       aes(x = date, y = Ra)) +
+  geom_bar(stat = "identity",
+           fill = palette_light()[[1]]) +
+  labs(title = "Porfoli Returns",
+       subtitle = "40% DBS, 30% OCBC and 30% UOB",
+       caption = "Shows an above zero trend meaning positive retuns",
+       x = "", y = "Monthly Returns") +
+  geom_smooth(method = "lm") +
+  theme_tq() + 
+  scale_color_tq() +
+  scale_y_continuous(labels = scales::percent)
+```
+:::
+
+### Computing investment growth
+
+Most of the time, we also want to see how our \$100,000 initial investment is growing. This is simple with the underlying `Return.portfolio` argument, `wealth.index = TRUE`. All we need to do is add these as additional parameters to `tq_portfolio()`!
+
+::: {style="font-size: 1.35em"}
+```{r}
+wts <- c(0.4, 0.3, 0.3)
+portfolio_growth_monthly <- SGBank_returns_monthly %>%
+  tq_portfolio(assets_col = Symbol,
+               returns_col = Ra,
+               weights = wts,
+               col_rename = "investment.growth",
+               wealth.index = TRUE) %>%
+  mutate(investment.growth = investment.growth * 100000)
+```
+:::
+
+### Visualising the growth
+
+::: panel-tabset
+## The code chunk
+
+The code chunk below will be used to plot the investment growth trends.
+
+::: {style="font-size: 1.35em"}
+```{r}
+#| eval: false
+ggplot(data = portfolio_growth_monthly,
+       aes(x = date, y = investment.growth)) +
+    geom_line(size = 1, color = palette_light()[[1]]) +
+    labs(title = "Portfolio Growth",
+         subtitle = "40% DBS, 30% OCBC, and 30% UOB",
+         caption = "Now we can really visualize performance!",
+         x = "", y = "Portfolio Value") +
+    geom_smooth(method = "loess") +
+    theme_tq() +
+    scale_color_tq() +
+    scale_y_continuous(labels = scales::dollar)
+```
+:::
+
+## The Plot
+
+```{r}
+#| echo: false
+#| fig-height: 7
+#| fig-width: 12
+ggplot(data = portfolio_growth_monthly,
+       aes(x = date, y = investment.growth)) +
+    geom_line(size = 1, color = palette_light()[[1]]) +
+    labs(title = "Portfolio Growth",
+         subtitle = "40% DBS, 30% OCBC, and 30% UOB",
+         caption = "Now we can really visualize performance!",
+         x = "", y = "Portfolio Value") +
+    geom_smooth(method = "loess") +
+    theme_tq() +
+    scale_color_tq() +
+    scale_y_continuous(labels = scales::dollar)
+```
+:::
